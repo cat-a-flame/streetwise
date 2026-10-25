@@ -52,3 +52,23 @@ export function slim(text) {
   }
   return JSON.stringify({ elements: json.elements || [] });
 }
+
+// Diagnostic: one tiny query per mirror, in parallel, with status and timing.
+export async function checkOverpass() {
+  const data = '[out:json][timeout:5];node(47.4979,19.0402,47.4989,19.0412);out count;';
+  return Promise.all(
+    ENDPOINTS.map(async (endpoint) => {
+      const t0 = Date.now();
+      try {
+        const res = await fetch(`${endpoint}?${new URLSearchParams({ data })}`, {
+          headers: HEADERS,
+          signal: AbortSignal.timeout(6000),
+        });
+        const text = await res.text();
+        return { endpoint, status: res.status, ms: Date.now() - t0, body: text.slice(0, 200) };
+      } catch (e) {
+        return { endpoint, error: `${e.name}: ${e.message}`, ms: Date.now() - t0 };
+      }
+    }),
+  );
+}
