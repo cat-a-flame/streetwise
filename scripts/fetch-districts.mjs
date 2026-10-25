@@ -2,7 +2,8 @@
 // so the app does not have to ask Overpass on every cold start.
 import { writeFile } from 'node:fs/promises';
 import osmtogeojson from 'osmtogeojson';
-import { BUDAPEST, OVERPASS_ENDPOINTS } from '../src/config.js';
+import { BUDAPEST } from '../src/config.js';
+import { ENDPOINTS as OVERPASS_ENDPOINTS } from '../server/overpass-proxy.js';
 
 const { south, west, north, east } = BUDAPEST.bounds;
 const query = `[out:json][timeout:90];rel["boundary"="administrative"]["admin_level"="9"](${south},${west},${north},${east});out geom;`;

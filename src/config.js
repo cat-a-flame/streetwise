@@ -9,11 +9,8 @@ export const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 export const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
-export const OVERPASS_ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-];
+// Same-origin relay (Netlify function / Vite middleware), see server/overpass-proxy.js
+export const OVERPASS_ENDPOINTS = ['/api/overpass'];
 
 // Meters. `pad` widens every Overpass query so one cached response (snapped to
 // ~100 m) still covers the exact clicked point.
