@@ -1,36 +1,70 @@
-// Server-side Overpass relay. Browsers cannot set a User-Agent and
-// overpass-api.de answered the in-browser requests with 406, so the app asks this
-// relay (Netlify function in production, Vite middleware locally) instead.
+// Official alternates first (same operator, separate capacity), then community mirrors.
 export const ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
+  'https://lz4.overpass-api.de/api/interpreter',
+  'https://z.overpass-api.de/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.openstreetmap.fr/api/interpreter',
 ];
 const HEADERS = {
   'User-Agent': 'streetwise/0.1 (https://github.com/cat-a-flame/streetwise)',
   Accept: 'application/json',
 };
 
-export async function relayOverpass(data, { totalMs = Number(process.env.OVERPASS_BUDGET_MS) || 9000 } = {}) {
-  if (!data || data.length > 20_000) return { status: 400, body: JSON.stringify({ error: 'bad query' }) };
-  const deadline = Date.now() + totalMs;
-  let last = { status: 502, body: JSON.stringify({ error: 'no upstream answered' }) };
-  for (const endpoint of ENDPOINTS) {
-    const left = deadline - Date.now();
-    if (left < 1500) break;
-    try {
-      const res = await fetch(`${endpoint}?${new URLSearchParams({ data })}`, {
-        headers: HEADERS,
-        signal: AbortSignal.timeout(Math.min(left, Math.max(left - 2000, 4000))),
-      });
-      const body = await res.text();
-      if (res.ok && !/runtime error/i.test(body.slice(0, 2000))) return { status: 200, body: slim(body) };
-      last = { status: res.status === 200 ? 502 : res.status, body: JSON.stringify({ error: `${endpoint} -> ${res.status}`, detail: body.slice(0, 300) }) };
-    } catch (e) {
-      last = { status: 504, body: JSON.stringify({ error: `${endpoint} -> ${e.name}` }) };
-    }
+async function attempt(endpoint, data, signal) {
+  try {
+    const res = await fetch(`${endpoint}?${new URLSearchParams({ data })}`, { headers: HEADERS, signal });
+    const body = await res.text();
+    if (res.ok && !/runtime error/i.test(body.slice(0, 2000))) return { ok: true, out: { status: 200, body: slim(body) } };
+    return { ok: false, out: { status: res.status === 200 ? 502 : res.status, body: JSON.stringify({ error: `${endpoint} -> ${res.status}`, detail: body.slice(0, 300) }) } };
+  } catch (e) {
+    return { ok: false, out: { status: 504, body: JSON.stringify({ error: `${endpoint} -> ${e.name}` }) } };
   }
-  return last;
+}
+
+// Hedged: public mirrors are often at capacity, so if one has not answered after
+// `hedgeMs` (or has failed) the next one is started too. First success wins.
+export function relayOverpass(data, { totalMs = Number(process.env.OVERPASS_BUDGET_MS) || 9000, hedgeMs = 2000 } = {}) {
+  if (!data || data.length > 20_000) return Promise.resolve({ status: 400, body: JSON.stringify({ error: 'bad query' }) });
+  return new Promise((resolve) => {
+    const ctrls = [];
+    let next = 0;
+    let pending = 0;
+    let done = false;
+    let hedge;
+    let last = { status: 504, body: JSON.stringify({ error: 'no upstream answered in time' }) };
+
+    const finish = (r) => {
+      if (done) return;
+      done = true;
+      clearTimeout(hedge);
+      clearTimeout(deadline);
+      ctrls.forEach((c) => c.abort());
+      resolve(r);
+    };
+    const deadline = setTimeout(() => finish(last), totalMs);
+
+    const start = () => {
+      clearTimeout(hedge);
+      if (done) return;
+      if (next >= ENDPOINTS.length) {
+        if (!pending) finish(last);
+        return;
+      }
+      const ctrl = new AbortController();
+      ctrls.push(ctrl);
+      pending++;
+      attempt(ENDPOINTS[next++], data, ctrl.signal).then((r) => {
+        pending--;
+        if (r.ok) return finish(r.out);
+        last = r.out;
+        start();
+      });
+      hedge = setTimeout(start, hedgeMs);
+    };
+    start();
+  });
 }
 
 // Overpass `out body` ships far more than the app reads. Dropping it keeps the
