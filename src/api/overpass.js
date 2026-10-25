@@ -57,7 +57,7 @@ async function post(endpoint, query, signal, timeoutMs) {
   signal?.addEventListener('abort', onAbort);
   const timer = setTimeout(() => ctrl.abort('timeout'), timeoutMs);
   try {
-    const res = await fetch(`${endpoint}?${new URLSearchParams({ data: query })}`, { signal: ctrl.signal });
+    const res = await fetch(`${endpoint}?${new URLSearchParams({ data: query })}`, { headers: { Accept: 'application/json' }, signal: ctrl.signal });
     if (!res.ok) throw new Error(`Overpass ${res.status}`);
     return await res.json();
   } catch (e) {
