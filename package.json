@@ -1,0 +1,21 @@
+{
+  "name": "streetwise",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Budapest lakókörnyék-felmérő albérlet- és lakáskereséshez",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test",
+    "fetch:districts": "node scripts/fetch-districts.mjs"
+  },
+  "dependencies": {
+    "leaflet": "1.9.4",
+    "osmtogeojson": "3.0.0-beta.5"
+  },
+  "devDependencies": {
+    "vite": "^7.1.0"
+  }
+}

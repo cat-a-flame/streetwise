@@ -1,0 +1,31 @@
+{
+  "_readme": "Kerületi bűnügyi alapadat. Töltsd ki a crimePer1000 mezőket (regisztrált bűncselekmény / 1000 lakos / év). A null érték azt jelenti, hogy még nincs kitöltve.",
+  "year": null,
+  "source": "",
+  "cityAverage": null,
+  "districts": {
+    "1": { "crimePer1000": null },
+    "2": { "crimePer1000": null },
+    "3": { "crimePer1000": null },
+    "4": { "crimePer1000": null },
+    "5": { "crimePer1000": null },
+    "6": { "crimePer1000": null },
+    "7": { "crimePer1000": null },
+    "8": { "crimePer1000": null },
+    "9": { "crimePer1000": null },
+    "10": { "crimePer1000": null },
+    "11": { "crimePer1000": null },
+    "12": { "crimePer1000": null },
+    "13": { "crimePer1000": null },
+    "14": { "crimePer1000": null },
+    "15": { "crimePer1000": null },
+    "16": { "crimePer1000": null },
+    "17": { "crimePer1000": null },
+    "18": { "crimePer1000": null },
+    "19": { "crimePer1000": null },
+    "20": { "crimePer1000": null },
+    "21": { "crimePer1000": null },
+    "22": { "crimePer1000": null },
+    "23": { "crimePer1000": null }
+  }
+}

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Streetwise · Budapest lakókörnyék-felmérő</title>
+  <meta name="description" content="Budapesti környékek összehasonlítása lakáskereséshez: boltok, közlekedés, zöldterület, közvilágítás.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2317375e'/%3E%3Cpath d='M8 22 L16 8 L24 22' stroke='%23f6f3ea' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><b>Streetwise</b><span>Budapest</span></div>
+    <div class="search">
+      <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Utca vagy városrész, pl. Istvánmező" aria-label="Keresés" aria-controls="results" aria-autocomplete="list">
+      <ul id="results" role="listbox" hidden></ul>
+    </div>
+    <div class="tools">
+      <button class="btn" data-draw="line">Utca rajzolása</button>
+      <button class="btn" data-draw="polygon">Terület rajzolása</button>
+    </div>
+  </header>
+  <main>
+    <div id="map" aria-label="Térkép"></div>
+    <div id="drawbar" hidden>
+      <span id="drawhint"></span>
+      <button class="btn" data-draw-act="undo">Visszavon</button>
+      <button class="btn primary" data-draw-act="finish">Kész</button>
+      <button class="btn" data-draw-act="cancel">Mégse</button>
+    </div>
+    <aside id="panel">
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="inspect" class="on">Elemzés</button>
+        <button role="tab" data-tab="places">Helyeim <span id="count" class="num"></span></button>
+      </nav>
+      <div id="tab-inspect" class="tabbody"></div>
+      <div id="tab-places" class="tabbody" hidden></div>
+    </aside>
+  </main>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
