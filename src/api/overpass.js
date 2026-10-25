@@ -17,7 +17,7 @@ export function buildQuery({ lat, lon }) {
   const at = `${lat},${lon}`;
   const { shop, stop, metro, green, park, lit, pad } = RADIUS;
   const greenAround = `(around:${green + pad},${at})`;
-  return `[out:json][timeout:60];
+  return `[out:json][timeout:25];
 nwr["shop"~"^(supermarket|convenience)$"](around:${shop + pad},${at});
 out center tags;
 (
@@ -47,19 +47,38 @@ way["highway"~"${STREET_TYPES}"](around:${lit + pad},${at});
 out geom;`;
 }
 
-async function runOverpass(query, signal) {
+const REQUEST_TIMEOUT = 30000;
+
+// Per-attempt timeout so a hung server falls through to the next endpoint
+// instead of leaving the UI loading forever.
+async function post(endpoint, query, signal, timeoutMs) {
+  const ctrl = new AbortController();
+  const onAbort = () => ctrl.abort();
+  signal?.addEventListener('abort', onAbort);
+  const timer = setTimeout(() => ctrl.abort('timeout'), timeoutMs);
+  try {
+    const res = await fetch(endpoint, { method: 'POST', body: new URLSearchParams({ data: query }), signal: ctrl.signal });
+    if (!res.ok) throw new Error(`Overpass ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    if (signal?.aborted) throw e;
+    throw new Error(ctrl.signal.reason === 'timeout' ? 'Az Overpass szerver nem válaszolt időben.' : e.message);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+// `queued` = go through the shared rate limiter; the one-off district download
+// must not block area lookups behind it.
+async function runOverpass(query, signal, queued = true) {
   let lastErr;
   for (const endpoint of OVERPASS_ENDPOINTS) {
     try {
-      const json = await limiter(async () => {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          body: new URLSearchParams({ data: query }),
-          signal,
-        });
-        if (!res.ok) throw new Error(`Overpass ${res.status}`);
-        return res.json();
-      }, signal);
+      const timeout = queued ? REQUEST_TIMEOUT : 85000;
+      const json = queued
+        ? await limiter(() => post(endpoint, query, signal, timeout), signal)
+        : await post(endpoint, query, signal, timeout);
       if (/runtime error/i.test(json.remark || '')) throw new Error(json.remark);
       return json;
     } catch (e) {
@@ -90,6 +109,7 @@ export async function fetchDistrictsFromOverpass(signal) {
   const raw = await runOverpass(
     `[out:json][timeout:90];rel["boundary"="administrative"]["admin_level"="9"](${south},${west},${north},${east});out geom;`,
     signal,
+    false,
   );
   await cacheSet(key, raw);
   return raw;
