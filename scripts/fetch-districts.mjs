@@ -12,17 +12,29 @@ const headers = {
   Accept: 'application/json',
 };
 
+// 502/504 from overpass-api.de usually means "busy right now": retry a few rounds,
+// with a per-attempt timeout so a stalled mirror cannot hang the script.
+const ROUNDS = 3;
+const ATTEMPT_TIMEOUT_MS = 120_000;
 let raw;
-for (const endpoint of OVERPASS_ENDPOINTS) {
-  try {
-    console.log(`Lekérdezés: ${endpoint}`);
-    const res = await fetch(`${endpoint}?${new URLSearchParams({ data: query })}`, { headers });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    raw = await res.json();
-    break;
-  } catch (e) {
-    console.warn(`  sikertelen: ${e.message}`);
+for (let round = 1; round <= ROUNDS && !raw; round++) {
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      console.log(`[${round}/${ROUNDS}] Lekérdezés: ${endpoint} (akár 2 percig is tarthat)`);
+      const res = await fetch(`${endpoint}?${new URLSearchParams({ data: query })}`, {
+        headers,
+        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      raw = await res.json();
+      if (/runtime error/i.test(raw.remark || '')) throw new Error(raw.remark);
+      break;
+    } catch (e) {
+      raw = undefined;
+      console.warn(`  sikertelen: ${e.name === 'TimeoutError' ? 'időtúllépés' : e.message}`);
+    }
   }
+  if (!raw && round < ROUNDS) await new Promise((r) => setTimeout(r, 10_000));
 }
 if (!raw) throw new Error('Egyik Overpass szerver sem válaszolt.');
 
