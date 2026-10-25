@@ -32,3 +32,7 @@ npm run build      # dist/
 - **Gyorsítótár**: Overpass-válaszok IndexedDB-ben, ~100 m-es rácsra kerekítve, 7 napig; Nominatim-válaszok localStorage-ban.
 
 Az OSM adatai hiányosak lehetnek (főleg fák és `lit` címkék), az eredmény tájékoztató jellegű.
+
+## Netlify
+
+Overpass is called through `netlify/functions/overpass.mjs` (`/api/overpass`). Serverless functions have a time limit (10 s on many plans), so the area lookup is split into four small queries and the relay gives up after 9 s (`OVERPASS_BUDGET_MS` env var). If you raise the function timeout in the Netlify UI, raise `OVERPASS_BUDGET_MS` too.

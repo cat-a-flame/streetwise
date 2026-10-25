@@ -3,7 +3,7 @@ import { createLimiter } from '../lib/http.js';
 import { cacheGet, cacheSet } from '../lib/idb.js';
 
 const TTL = 7 * 24 * 3600 * 1000;
-const limiter = createLimiter(1500);
+const limiter = createLimiter(500, { serial: false });
 
 const GREEN_LEISURE = '^(park|garden|nature_reserve)$';
 const GREEN_LANDUSE = '^(grass|forest|recreation_ground|village_green|meadow)$';
@@ -11,13 +11,15 @@ const GREEN_NATURAL = '^(wood|scrub|grassland|heath)$';
 const STREET_TYPES =
   '^(residential|living_street|pedestrian|footway|path|cycleway|steps|unclassified|tertiary|secondary|primary|trunk)$';
 
-// Snapped point -> one request covering shops, stops (+ their route relations),
-// green areas, trees and street lighting.
-export function buildQuery({ lat, lon }) {
+// Snapped point -> four small queries (a single big one outlasts the 10 s limit of
+// serverless relays): shops + stops (+ route relations), green areas, trees, street lighting.
+export function buildQueries({ lat, lon }) {
   const at = `${lat},${lon}`;
   const { shop, stop, metro, green, park, lit, pad } = RADIUS;
   const greenAround = `(around:${green + pad},${at})`;
-  return `[out:json][timeout:25];
+  const head = '[out:json][timeout:25];';
+  return {
+    poi: `${head}
 nwr["shop"~"^(supermarket|convenience)$"](around:${shop + pad},${at});
 out center tags;
 (
@@ -29,7 +31,8 @@ node(around.metro:250)["public_transport"="stop_position"]["subway"="yes"]->.met
 (.surface;.metro;.metropos;)->.stops;
 .stops out body;
 rel(bn.stops)["route"~"^(bus|tram|trolleybus|subway)$"];
-out body;
+out body;`,
+    green: `${head}
 (
   way["leisure"~"${GREEN_LEISURE}"]${greenAround};
   rel["leisure"~"${GREEN_LEISURE}"]${greenAround};
@@ -40,14 +43,17 @@ out body;
   way["leisure"="park"](around:${park + pad},${at});
   rel["leisure"="park"](around:${park + pad},${at});
 );
-out geom;
+out geom;`,
+    trees: `${head}
 node["natural"="tree"]${greenAround};
-out skel qt;
+out skel qt;`,
+    lit: `${head}
 way["highway"~"${STREET_TYPES}"](around:${lit + pad},${at});
-out geom;`;
+out geom;`,
+  };
 }
 
-const REQUEST_TIMEOUT = 60000;
+const REQUEST_TIMEOUT = 20000;
 
 // Per-attempt timeout so a hung server falls through to the next endpoint
 // instead of leaving the UI loading forever.
@@ -91,12 +97,31 @@ async function runOverpass(query, signal, queued = true) {
 
 export const snap = (v) => Math.round(v * 1000) / 1000;
 
+// Runs async tasks with at most `n` in flight (Overpass allows ~2 slots per IP).
+async function pool(tasks, n) {
+  const out = [];
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: n }, async () => {
+      while (next < tasks.length) {
+        const i = next++;
+        out[i] = await tasks[i]();
+      }
+    }),
+  );
+  return out;
+}
+
 export async function fetchArea(pt, signal) {
   const snapped = { lat: snap(pt.lat), lon: snap(pt.lon) };
-  const key = `ow:v1:${snapped.lat.toFixed(3)},${snapped.lon.toFixed(3)}`;
+  const key = `ow:v2:${snapped.lat.toFixed(3)},${snapped.lon.toFixed(3)}`;
   const cached = await cacheGet(key, TTL);
   if (cached) return { raw: cached, cached: true };
-  const raw = await runOverpass(buildQuery(snapped), signal);
+  const parts = await pool(
+    Object.values(buildQueries(snapped)).map((q) => () => runOverpass(q, signal)),
+    2,
+  );
+  const raw = { elements: parts.flatMap((p) => p.elements || []) };
   await cacheSet(key, raw);
   return { raw, cached: false };
 }

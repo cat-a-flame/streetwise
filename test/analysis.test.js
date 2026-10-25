@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { analyze } from '../src/analysis.js';
 import { distToPolygon, haversine, pointInPolygon, fromXY } from '../src/lib/geo.js';
 import { foldAccents, normalizeQuery } from '../src/api/nominatim.js';
-import { buildQuery } from '../src/api/overpass.js';
+import { buildQueries } from '../src/api/overpass.js';
 import { createLimiter } from '../src/lib/http.js';
 
 const pt = { lat: 47.5, lon: 19.04 };
@@ -86,7 +86,7 @@ test('hungarian query normalisation', () => {
 });
 
 test('overpass query contains all sections', () => {
-  const q = buildQuery({ lat: 47.5, lon: 19.04 });
+  const q = Object.values(buildQueries({ lat: 47.5, lon: 19.04 })).join('\n');
   for (const s of ['supermarket', 'bus_stop', 'tram_stop', 'subway', 'natural"="tree', 'highway', 'out geom']) assert.ok(q.includes(s), s);
 });
 

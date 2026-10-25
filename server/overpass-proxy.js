@@ -11,17 +11,17 @@ const HEADERS = {
   Accept: 'application/json',
 };
 
-export async function relayOverpass(data, { totalMs = 50_000 } = {}) {
+export async function relayOverpass(data, { totalMs = Number(process.env.OVERPASS_BUDGET_MS) || 9000 } = {}) {
   if (!data || data.length > 20_000) return { status: 400, body: JSON.stringify({ error: 'bad query' }) };
   const deadline = Date.now() + totalMs;
   let last = { status: 502, body: JSON.stringify({ error: 'no upstream answered' }) };
   for (const endpoint of ENDPOINTS) {
     const left = deadline - Date.now();
-    if (left < 3000) break;
+    if (left < 1500) break;
     try {
       const res = await fetch(`${endpoint}?${new URLSearchParams({ data })}`, {
         headers: HEADERS,
-        signal: AbortSignal.timeout(Math.min(left, 25_000)),
+        signal: AbortSignal.timeout(Math.min(left, Math.max(left - 2000, 4000))),
       });
       const body = await res.text();
       if (res.ok && !/runtime error/i.test(body.slice(0, 2000))) return { status: 200, body: slim(body) };
