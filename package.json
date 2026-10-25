@@ -1,6 +1,6 @@
 {
   "name": "streetwise",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "Budapest lakókörnyék-felmérő albérlet- és lakáskereséshez",
