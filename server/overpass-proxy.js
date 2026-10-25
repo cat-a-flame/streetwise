@@ -24,11 +24,31 @@ export async function relayOverpass(data, { totalMs = 50_000 } = {}) {
         signal: AbortSignal.timeout(Math.min(left, 25_000)),
       });
       const body = await res.text();
-      if (res.ok && !/runtime error/i.test(body.slice(0, 2000))) return { status: 200, body };
+      if (res.ok && !/runtime error/i.test(body.slice(0, 2000))) return { status: 200, body: slim(body) };
       last = { status: res.status === 200 ? 502 : res.status, body: JSON.stringify({ error: `${endpoint} -> ${res.status}`, detail: body.slice(0, 300) }) };
     } catch (e) {
       last = { status: 504, body: JSON.stringify({ error: `${endpoint} -> ${e.name}` }) };
     }
   }
   return last;
+}
+
+// Overpass `out body` ships far more than the app reads. Dropping it keeps the
+// payload well under the 6 MB limit of buffered serverless responses.
+export function slim(text) {
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return text;
+  }
+  for (const el of json.elements || []) {
+    delete el.nodes;
+    delete el.bounds;
+    // Stop relations: only stop/platform nodes matter, not the route geometry.
+    if (el.type === 'relation' && el.tags?.route && el.members) {
+      el.members = el.members.filter((m) => m.type === 'node').map(({ type, ref }) => ({ type, ref }));
+    }
+  }
+  return JSON.stringify({ elements: json.elements || [] });
 }
