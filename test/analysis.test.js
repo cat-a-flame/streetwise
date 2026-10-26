@@ -96,3 +96,13 @@ test('limiter spaces tasks', async () => {
   await Promise.all([1, 2, 3].map(() => run(async () => times.push(Date.now()))));
   assert.ok(times[1] - times[0] >= 115 && times[2] - times[1] >= 115);
 });
+
+test('null entries in out-geom geometry are ignored', () => {
+  const raw = { elements: [
+    { type: 'way', id: 1, tags: { highway: 'residential', name: 'X utca', lit: 'yes' }, geometry: [at(-50, 10), null, at(50, 10)] },
+    { type: 'way', id: 2, tags: { leisure: 'park' }, geometry: [null, null] },
+    { type: 'relation', id: 3, tags: { leisure: 'park' }, members: [{ type: 'way', ref: 9, role: 'outer', geometry: [null, ...square(0, 0, 50)] }] },
+  ] };
+  const r = analyze(raw, pt);
+  assert.equal(r.street.name, 'X utca');
+});

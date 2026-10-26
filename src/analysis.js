@@ -177,7 +177,7 @@ function analyzeGreen(els, pt) {
 
 function analyzeStreets(els, pt) {
   const ways = els
-    .filter((e) => e.type === 'way' && e.tags?.highway && e.geometry?.length)
+    .filter((e) => e.type === 'way' && e.tags?.highway && e.geometry?.length > 1)
     .map((e) => ({ tags: e.tags, pts: e.geometry.map((g) => ({ lat: g.lat, lon: g.lon })) }));
 
   let lit = 0, unlit = 0, unknown = 0;
@@ -217,8 +217,17 @@ function analyzeStreets(els, pt) {
   return { litShare, street };
 }
 
+// `out geom` puts null in geometry arrays for nodes it could not resolve.
+function dropNullGeometry(els) {
+  for (const el of els) {
+    if (el.geometry) el.geometry = el.geometry.filter(Boolean);
+    if (el.members) for (const m of el.members) if (m.geometry) m.geometry = m.geometry.filter(Boolean);
+  }
+  return els;
+}
+
 export function analyze(raw, pt) {
-  const els = raw.elements || [];
+  const els = dropNullGeometry(raw.elements || []);
   const transport = analyzeTransport(els, pt);
   const { litShare, street } = analyzeStreets(els, pt);
   return {
