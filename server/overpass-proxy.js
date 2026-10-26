@@ -1,11 +1,11 @@
-// Official alternates first (same operator, separate capacity), then community mirrors.
+// Ordered by how well they have answered from Netlify; the busy official servers stay as fallbacks.
 export const ENDPOINTS = [
+  'https://overpass.openstreetmap.fr/api/interpreter',
   'https://overpass-api.de/api/interpreter',
-  'https://lz4.overpass-api.de/api/interpreter',
   'https://z.overpass-api.de/api/interpreter',
+  'https://lz4.overpass-api.de/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.openstreetmap.fr/api/interpreter',
 ];
 const HEADERS = {
   'User-Agent': 'streetwise/0.1 (https://github.com/cat-a-flame/streetwise)',
