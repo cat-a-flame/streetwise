@@ -4,7 +4,7 @@ import { esc, fmtDist, fmtNum } from './lib/util.js';
 import { fmtClock } from './lib/time.js';
 import { intToRoman } from './lib/util.js';
 
-const walk = (w) => `<span class="num">~${fmtDist(w.meters)}</span> <span class="dim">· ~${w.minutes} perc séta</span>`;
+const walk = (w) => `<span class="num">~${fmtDist(w.meters)}</span> <span class="dim">~${w.minutes} perc séta</span>`;
 
 export function renderIdle() {
   return `<div class="empty">

@@ -85,21 +85,22 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
 .empty p { color: var(--muted); }
 .loc { padding-bottom: 14px; }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.tabbody section { border-top: 1px solid var(--line); padding: 14px 0; }
+.tabbody section { border-top: 2px solid var(--ink); padding: 14px 0 26px; margin-top: 10px; }
 .tabbody section h3, .pform h3 {
-  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--accent); margin-bottom: 8px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--accent); margin-bottom: 12px;
 }
 .rows { display: flex; flex-direction: column; }
 .row {
   display: flex; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0;
-  border-bottom: 1px dotted var(--line); padding: 7px 0; cursor: pointer;
+  border-bottom: 1px dotted var(--line); padding: 8px 0; cursor: pointer;
 }
 .row:hover .row-main { text-decoration: underline; text-underline-offset: 3px; }
 .row-main { display: flex; flex-direction: column; min-width: 0; }
 .row-main small { color: var(--muted); }
 .row-side { text-align: right; flex: none; font-size: 13px; }
 .row-side .dim { display: block; font-size: 12px; font-family: var(--sans); }
-.mode h4 { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 8px 0 2px; }
+.mode h4 { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 0 0 2px; }
+.mode + .mode { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
 .sq { display: inline-grid; place-items: center; width: 18px; height: 18px; font-size: 11px; font-weight: 700; }
 .chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
 .chip { font-family: var(--mono); font-size: 12px; padding: 0 5px; border: 1.5px solid var(--c); line-height: 1.5; }
@@ -111,7 +112,7 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
 .score-n { font-family: var(--mono); font-size: 34px; line-height: 1; letter-spacing: -0.04em; }
 .score-n small { font-size: 14px; color: var(--muted); letter-spacing: 0; }
 .score-l { color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: .1em; }
-.foot { border-top: 1px solid var(--line); padding-top: 10px; }
+.tabbody .foot { border-top: 2px solid var(--ink); padding-top: 12px; margin-top: 10px; }
 .loading { color: var(--muted); }
 .loading .dim { margin-top: 4px; font-family: var(--mono); font-size: 12px; }
 .spin { display: inline-block; width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--ink); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -1px; margin-right: 6px; }
@@ -123,7 +124,8 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
 .linkbtn { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
 /* destinations */
-.dest { padding: 8px 0 10px; border-bottom: 1px dotted var(--line); }
+.dest { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.dest:first-of-type { padding-top: 0; }
 .dest:last-child { border-bottom: 0; }
 .dest h4 { font-size: 14px; }
 .addr { font-size: 12px; }
