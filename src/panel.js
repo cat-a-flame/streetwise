@@ -1,4 +1,5 @@
 import { MODES, MODE_ORDER, STATUS } from './config.js';
+import { haversine } from './lib/geo.js';
 import { esc, fmtDist, fmtNum } from './lib/util.js';
 import { fmtClock } from './lib/time.js';
 import { intToRoman } from './lib/util.js';
@@ -113,20 +114,34 @@ export function renderRoutes(dest, { transit, car }) {
   return t + c;
 }
 
-export function renderDestinations(dests) {
+function summary(d, r, from) {
+  const km = haversine(from, d) / 1000;
+  const dist = `<span class="num">${fmtNum(km, 1)} km</span> légvonalban`;
+  if (!r) return `<div class="dim sum">${dist}</div>`;
+  if (r.pending) return `<div class="dim sum">${dist} · <span class="spin"></span> menetidő keresése…</div>`;
+  const t = r.transit.error ? 'nem sikerült' : r.transit.value.length ? `<b class="num">${r.transit.value[0].minutes} perc</b>` : 'nincs útvonal';
+  const c = r.car.error ? 'nem sikerült' : `<b class="num">${r.car.value.minutes} perc</b> <span class="dim">(${fmtNum(r.car.value.km, 1)} km)</span>`;
+  return `<div class="dim sum">${dist}</div>
+    <dl class="kv times"><div><dt>Tömegközlekedés</dt><dd>${t}</dd></div><div><dt>Autó</dt><dd>${c}</dd></div></dl>`;
+}
+
+export function renderDest(d, r, open, from) {
+  const head = `<h4>${esc(d.name)}</h4>`;
+  if (d.state === 'loading') return `${head}<p class="dim">Cím keresése…</p>`;
+  if (!d.lat) return `${head}<p class="dim">A cím nem található.</p>`;
+  const ready = r && !r.pending;
+  return `${head}<div class="dim addr">${esc(d.label)}</div>${summary(d, r, from)}
+    ${ready ? `<button class="btn small" data-act="routes" data-dest="${esc(d.id)}">${open ? 'Útvonalak elrejtése' : 'Útvonalak mutatása'}</button>` : ''}
+    ${ready && open ? `<div class="routes">${renderRoutes(d, r)}</div>` : ''}`;
+}
+
+export function renderDestinations(dests, routes, openIds, from) {
   return dests
-    .map((d) => {
-      const head = `<h4>${esc(d.name)}</h4>`;
-      if (d.state === 'loading') return `<div class="dest">${head}<p class="dim">Cím keresése…</p></div>`;
-      if (!d.lat) return `<div class="dest">${head}<p class="dim">A cím nem található.</p></div>`;
-      return `<div class="dest" data-dest="${esc(d.id)}">${head}
-        <div class="dim addr">${esc(d.label)}</div>
-        <div class="routes" id="routes-${esc(d.id)}"><button class="btn" data-act="routes" data-dest="${esc(d.id)}">Útvonalak mutatása</button></div></div>`;
-    })
+    .map((d) => `<div class="dest" id="dest-${esc(d.id)}">${renderDest(d, routes[d.id], openIds.has(d.id), from)}</div>`)
     .join('');
 }
 
-export function renderResult(res, { district, label, cached, dests }) {
+export function renderResult(res, { district, label, cached, dests, routes, openIds }) {
   const p = res.point;
   const dTitle = district ? `${intToRoman(district.properties.num)}. kerület · ${esc(district.properties.name)}` : 'Budapesten kívül';
   return `
@@ -142,7 +157,7 @@ export function renderResult(res, { district, label, cached, dests }) {
   <section><h3>Közlekedés</h3>${transport(res.transport)}</section>
   <section><h3>Zöldterület</h3>${green(res.green)}</section>
   <section><h3>Éjszakai biztonság · közvilágítás</h3>${lit(res.lit)}</section>
-  <section><h3>Úti célok</h3>${renderDestinations(dests)}</section>
+  <section><h3>Úti célok</h3>${renderDestinations(dests, routes, openIds, res.point)}</section>
   <p class="note foot">A gyaloglási táv becslés: légvonal × 1,3, 80 m/perc. Adatok: © OpenStreetMap-közreműködők.</p>`;
 }
 

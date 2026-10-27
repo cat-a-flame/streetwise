@@ -123,7 +123,11 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
 .dest { padding: 8px 0 10px; border-bottom: 1px dotted var(--line); }
 .dest:last-child { border-bottom: 0; }
 .dest h4 { font-size: 14px; }
-.addr { font-size: 12px; margin-bottom: 6px; }
+.addr { font-size: 12px; }
+.sum { font-size: 12px; margin: 2px 0 4px; }
+.times { margin-bottom: 6px; }
+.btn.small { padding: 3px 8px; font-size: 13px; }
+.routes { margin-top: 4px; }
 .routes h5 { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 10px 0 2px; font-weight: 600; }
 .routes h5 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .row.route.sel { background: #ece8db; box-shadow: inset 3px 0 0 var(--accent); padding-left: 8px; }

@@ -19,6 +19,7 @@ const state = {
   districts: [],
   dests: DESTINATIONS.map((d) => ({ ...d, state: 'loading' })),
   routes: {}, // destId -> { transit, car } for the inspected point
+  open: new Set(), // destinations whose route options are expanded
   places: loadPlaces(),
   filter: 'all',
   selectedId: null,
@@ -53,33 +54,38 @@ function renderInspect() {
   if (!l?.result) return;
   const district = findDistrict(state.districts, l.pt);
   mapUi.highlightDistrict(district?.properties.num);
-  inspectEl.innerHTML = panel.renderResult(l.result, { district, label: l.label, cached: l.cached, dests: state.dests });
-  for (const id of Object.keys(state.routes)) fillRoutes(id);
+  inspectEl.innerHTML = panel.renderResult(l.result, { district, label: l.label, cached: l.cached, dests: state.dests, routes: state.routes, openIds: state.open });
 }
 
 /* ---------- routes to the fixed destinations ---------- */
 
 const destById = (id) => state.dests.find((d) => d.id === id);
 
-function fillRoutes(id) {
-  const el = document.getElementById(`routes-${id}`);
-  const r = state.routes[id];
-  if (!el || !r) return;
-  el.innerHTML = r.pending ? '<p class="dim"><span class="spin"></span> Útvonalak keresése…</p>' : panel.renderRoutes(destById(id), r);
+function fillDest(id) {
+  const el = document.getElementById(`dest-${id}`);
+  if (el && state.last) el.innerHTML = panel.renderDest(destById(id), state.routes[id], state.open.has(id), state.last.pt);
 }
 
 async function loadRoutes(id) {
   const d = destById(id);
   const from = state.last?.pt;
-  if (!d?.lat || !from) return;
+  if (!d?.lat || !from || state.routes[id]) return;
   const token = state.token;
   state.routes[id] = { pending: true };
-  fillRoutes(id);
+  fillDest(id);
   const wrap = (p) => p.then((value) => ({ value }), (e) => ({ error: e.message }));
   const [transit, car] = await Promise.all([wrap(fetchTransit(from, d)), wrap(fetchCar(from, d))]);
   if (token !== state.token) return;
   state.routes[id] = { transit, car };
-  fillRoutes(id);
+  fillDest(id);
+}
+
+function toggleRoutes(id) {
+  if (state.open.has(id)) {
+    state.open.delete(id);
+    mapUi.clearRoute();
+  } else state.open.add(id);
+  fillDest(id);
 }
 
 function showRoute(id, kind, i) {
@@ -87,7 +93,7 @@ function showRoute(id, kind, i) {
   if (!r) return;
   if (kind === 'car') mapUi.showRoute([{ geometry: r.car.value.geometry, color: '#17375e' }]);
   else mapUi.showRoute(r.transit.value[i].legs.map((l) => ({ geometry: l.geometry, color: l.color, dashed: !l.transit })));
-  document.querySelectorAll(`#routes-${id} .route`).forEach((b) => b.classList.toggle('sel', b.dataset.kind === kind && Number(b.dataset.i) === i));
+  document.querySelectorAll(`#dest-${id} .route`).forEach((b) => b.classList.toggle('sel', b.dataset.kind === kind && Number(b.dataset.i) === i));
 }
 
 async function inspect(pt, { label = null } = {}) {
@@ -97,6 +103,7 @@ async function inspect(pt, { label = null } = {}) {
   }
   const token = ++state.token;
   state.routes = {};
+  state.open.clear();
   mapUi.clearRoute();
   state.abort?.abort();
   state.abort = new AbortController();
@@ -111,6 +118,7 @@ async function inspect(pt, { label = null } = {}) {
     state.last = { pt, label, result, cached };
     mapUi.showInspection(result, pt);
     renderInspect();
+    for (const d of state.dests) if (d.lat) loadRoutes(d.id);
     inspectEl.scrollTop = 0;
   } catch (e) {
     if (e.name === 'AbortError' || token !== state.token) return;
@@ -125,7 +133,7 @@ inspectEl.addEventListener('click', (e) => {
   const l = state.last;
   if (act === 'focus') mapUi.focusMarker(key);
   else if (act === 'retry' && l) inspect(l.pt, { label: l.label });
-  else if (act === 'routes') loadRoutes(b.dataset.dest);
+  else if (act === 'routes') toggleRoutes(b.dataset.dest);
   else if (act === 'show-route') showRoute(b.dataset.dest, b.dataset.kind, Number(b.dataset.i));
   else if (act === 'mark-point' && l) {
     openForm({ geometry: { type: 'Point', coordinates: [l.pt.lon, l.pt.lat] }, name: l.label || l.result?.street?.name || '' }, true);
@@ -382,7 +390,10 @@ syncMap();
       d.state = 'missing';
     }
     mapUi.setDestinations(state.dests);
-    if (state.last?.result && !Object.keys(state.routes).length) renderInspect();
+    if (state.last?.result) {
+      renderInspect();
+      if (d.lat) loadRoutes(d.id);
+    }
   }
 })();
 loadDistricts()
