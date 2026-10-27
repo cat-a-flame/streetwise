@@ -44,8 +44,8 @@ const lineSort = (a, b) => {
 };
 
 const CHAINS = [
-  { key: 'spar', label: 'Spar', re: /\b(inter)?spar\b/i },
-  { key: 'lidl', label: 'Lidl', re: /\blidl\b/i },
+  { key: 'spar', label: 'Spar', re: /\b(inter)?spar\b/i, wikidata: 'Q610492' },
+  { key: 'lidl', label: 'Lidl', re: /\blidl\b/i, wikidata: 'Q151954' },
 ];
 
 function analyzeShops(els, pt) {
@@ -64,7 +64,7 @@ function analyzeShops(els, pt) {
       dist,
       walk: walkInfo(dist),
       type: e.tags.shop,
-      chain: CHAINS.find((ch) => ch.re.test(`${e.tags.name || ''} ${e.tags.brand || ''}`))?.key ?? null,
+      chain: CHAINS.find((ch) => ch.wikidata === e.tags['brand:wikidata'] || ch.re.test(`${e.tags.name || ''} ${e.tags.brand || ''}`))?.key ?? null,
       name: e.tags.name || e.tags.brand || (e.tags.shop === 'supermarket' ? 'Szupermarket' : 'Kisbolt'),
     });
   }

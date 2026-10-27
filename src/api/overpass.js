@@ -20,11 +20,19 @@ export function buildQueries({ lat, lon }) {
   const head = '[out:json][timeout:25];';
   return {
     shops: `${head}
-nwr["shop"~"^(supermarket|convenience)$"](around:${shop + pad},${at});
-out center tags;
-nwr["shop"~"^(supermarket|convenience)$"]["name"~"spar|lidl",i](around:${chain + pad},${at});
-out center tags;
-nwr["shop"~"^(supermarket|convenience)$"]["brand"~"spar|lidl",i](around:${chain + pad},${at});
+(
+  node["shop"~"^(supermarket|convenience)$"](around:${shop + pad},${at});
+  way["shop"~"^(supermarket|convenience)$"](around:${shop + pad},${at});
+);
+out center tags;`,
+    // Nearest Spar / Lidl. Optional extra: brand:wikidata is an exact tag match (cheap);
+    // the anchored name regex catches shops mapped without it.
+    chains: `${head}
+(
+  nwr["brand:wikidata"="Q151954"](around:${chain + pad},${at});
+  nwr["brand:wikidata"="Q610492"](around:${chain + pad},${at});
+  nwr["shop"~"^(supermarket|convenience)$"]["name"~"^(Lidl|LIDL|Spar|SPAR|Interspar|INTERSPAR)( |$)"](around:${chain + pad},${at});
+);
 out center tags;`,
     stops: `${head}
 (
@@ -128,7 +136,7 @@ async function pool(tasks, n) {
   return out;
 }
 
-export const PARTS = ['shops', 'stops', 'green', 'trees', 'lit', 'park'];
+export const PARTS = ['shops', 'stops', 'green', 'trees', 'lit', 'park', 'chains'];
 
 // Loads the area piece by piece. Each part is cached on its own, so a retry only
 // fetches what is still missing, and `onPart` lets the UI fill in sections as

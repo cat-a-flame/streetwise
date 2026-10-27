@@ -122,3 +122,8 @@ test('nearest Spar/Lidl is appended only when not already in the list', () => {
   r = analyze({ elements: [{ type: 'node', id: 7, ...at(2200, 0), tags: { shop: 'supermarket', brand: 'SPAR' } }, shop(8, 'Sparta Market', 1800)] }, pt);
   assert.deepEqual(r.shops.map((s) => s.extra ?? null), ['Spar']); // Sparta Market (1.8 km) is outside the list radius and not a Spar
 });
+
+test('chain detected through brand:wikidata even when the name is different', () => {
+  const r = analyze({ elements: [{ type: 'node', id: 3, ...at(2100, 0), tags: { shop: 'supermarket', name: 'Szupermarket', 'brand:wikidata': 'Q151954' } }] }, pt);
+  assert.equal(r.shops[0].extra, 'Lidl');
+});

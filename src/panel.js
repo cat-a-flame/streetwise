@@ -165,7 +165,7 @@ export function renderResult(res, { district, label, status, errors, dests, rout
       ${res.street ? `<button class="btn" data-act="mark-street">Utca jelölése: ${esc(res.street.name)}</button>` : ''}
     </div>
   </header>
-  ${section('Élelmiszerbolt', ['shops'], status, errors, () => shops(res.shops))}
+  ${section('Élelmiszerbolt', ['shops'], status, errors, () => shops(res.shops) + (status.chains === 'failed' ? '<p class="note">A legközelebbi Spar / Lidl keresése nem sikerült. <button class="linkbtn" data-act="retry">Újra</button></p>' : ''))}
   ${section('Közlekedés', ['stops'], status, errors, () => transport(res.transport))}
   ${section('Zöldterület', ['green', 'trees', 'park'], status, errors, () => green(res.green))}
   ${section('Éjszakai biztonság · közvilágítás', ['lit'], status, errors, () => lit(res.lit))}
