@@ -33,22 +33,22 @@ function shops(list) {
 }
 
 function transport(t) {
-  return MODE_ORDER.map((mode) => {
-    const mm = MODES[mode];
-    const stops = t[mode];
-    const body = stops.length
-      ? stops
-          .map(
-            (s, i) => `<button class="row" data-act="focus" data-key="${mode}-${i}">
+  const html = MODE_ORDER.filter((mode) => t[mode].length)
+    .map((mode) => {
+      const mm = MODES[mode];
+      const body = t[mode]
+        .map(
+          (s, i) => `<button class="row" data-act="focus" data-key="${mode}-${i}">
           <span class="row-main">${esc(s.name)}
             <span class="chips">${s.lines.map((l) => `<span class="chip" style="--c:${mm.color}">${esc(l)}</span>`).join('') || '<small>vonalak nincsenek az OSM-ben</small>'}</span>
           </span>
           <span class="row-side">${walk(s.walk)}</span></button>`,
-          )
-          .join('')
-      : `<p class="dim">Nincs a közelben.</p>`;
-    return `<div class="mode"><h4><span class="sq" style="background:${mm.color};color:${mm.text}">${mm.letter}</span>${mm.label}</h4>${body}</div>`;
-  }).join('');
+        )
+        .join('');
+      return `<div class="mode"><h4><span class="sq" style="background:${mm.color};color:${mm.text}">${mm.letter}</span>${mm.label}</h4>${body}</div>`;
+    })
+    .join('');
+  return html || '<p class="dim">Nincs megálló a közelben (600 m-en belül, metró 1,5 km-en belül).</p>';
 }
 
 function green(g) {
