@@ -94,6 +94,7 @@ async function runOverpass(query, signal, queued = true) {
     } catch (e) {
       if (e.name === 'AbortError') throw e;
       lastErr = e;
+      lastErr.busy = /\b(429|502|503|504)\b|nem válaszolt/.test(e.message);
     }
   }
   throw lastErr;
@@ -116,13 +117,38 @@ async function pool(tasks, n) {
   return out;
 }
 
+const sleep = (ms, signal) =>
+  new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => {
+      clearTimeout(t);
+      reject(new DOMException('Aborted', 'AbortError'));
+    });
+  });
+
+// The public Overpass servers are often at capacity (502/504): retry with backoff,
+// per query, so parts that already succeeded are not repeated.
+async function withRetry(task, signal, delays = [2000, 5000]) {
+  for (let i = 0; ; i++) {
+    try {
+      return await task();
+    } catch (e) {
+      if (e.name === 'AbortError' || !e.busy || i >= delays.length) {
+        if (e.busy) e.message = 'Az Overpass szerverek jelenleg túlterheltek. Próbáld újra egy perc múlva.';
+        throw e;
+      }
+      await sleep(delays[i], signal);
+    }
+  }
+}
+
 export async function fetchArea(pt, signal) {
   const snapped = { lat: snap(pt.lat), lon: snap(pt.lon) };
   const key = `ow:v3:${snapped.lat.toFixed(3)},${snapped.lon.toFixed(3)}`;
   const cached = await cacheGet(key, TTL);
   if (cached) return { raw: cached, cached: true };
   const parts = await pool(
-    Object.values(buildQueries(snapped)).map((q) => () => runOverpass(q, signal)),
+    Object.values(buildQueries(snapped)).map((q) => () => withRetry(() => runOverpass(q, signal), signal)),
     2,
   );
   const raw = { elements: parts.flatMap((p) => p.elements || []) };
