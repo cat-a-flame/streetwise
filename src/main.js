@@ -1,9 +1,11 @@
 import './style.css';
 import { analyze } from './analysis.js';
 import { fetchArea } from './api/overpass.js';
-import { searchPlaces } from './api/nominatim.js';
+import { geocodeFixed, searchPlaces } from './api/nominatim.js';
 import { BUDAPEST } from './config.js';
-import { findDistrict, loadDistricts, loadSafety } from './districts.js';
+import { findDistrict, loadDistricts } from './districts.js';
+import { DESTINATIONS } from './destinations.js';
+import { fetchCar, fetchTransit } from './api/routing.js';
 import { debounce, esc, newId } from './lib/util.js';
 import * as mapUi from './map.js';
 import * as panel from './panel.js';
@@ -15,7 +17,8 @@ const placesEl = $('#tab-places');
 
 const state = {
   districts: [],
-  safety: null,
+  dests: DESTINATIONS.map((d) => ({ ...d, state: 'loading' })),
+  routes: {}, // destId -> { transit, car } for the inspected point
   places: loadPlaces(),
   filter: 'all',
   selectedId: null,
@@ -50,7 +53,41 @@ function renderInspect() {
   if (!l?.result) return;
   const district = findDistrict(state.districts, l.pt);
   mapUi.highlightDistrict(district?.properties.num);
-  inspectEl.innerHTML = panel.renderResult(l.result, { district, safety: state.safety, label: l.label, cached: l.cached });
+  inspectEl.innerHTML = panel.renderResult(l.result, { district, label: l.label, cached: l.cached, dests: state.dests });
+  for (const id of Object.keys(state.routes)) fillRoutes(id);
+}
+
+/* ---------- routes to the fixed destinations ---------- */
+
+const destById = (id) => state.dests.find((d) => d.id === id);
+
+function fillRoutes(id) {
+  const el = document.getElementById(`routes-${id}`);
+  const r = state.routes[id];
+  if (!el || !r) return;
+  el.innerHTML = r.pending ? '<p class="dim"><span class="spin"></span> Útvonalak keresése…</p>' : panel.renderRoutes(destById(id), r);
+}
+
+async function loadRoutes(id) {
+  const d = destById(id);
+  const from = state.last?.pt;
+  if (!d?.lat || !from) return;
+  const token = state.token;
+  state.routes[id] = { pending: true };
+  fillRoutes(id);
+  const wrap = (p) => p.then((value) => ({ value }), (e) => ({ error: e.message }));
+  const [transit, car] = await Promise.all([wrap(fetchTransit(from, d)), wrap(fetchCar(from, d))]);
+  if (token !== state.token) return;
+  state.routes[id] = { transit, car };
+  fillRoutes(id);
+}
+
+function showRoute(id, kind, i) {
+  const r = state.routes[id];
+  if (!r) return;
+  if (kind === 'car') mapUi.showRoute([{ geometry: r.car.value.geometry, color: '#17375e' }]);
+  else mapUi.showRoute(r.transit.value[i].legs.map((l) => ({ geometry: l.geometry, color: l.color, dashed: !l.transit })));
+  document.querySelectorAll(`#routes-${id} .route`).forEach((b) => b.classList.toggle('sel', b.dataset.kind === kind && Number(b.dataset.i) === i));
 }
 
 async function inspect(pt, { label = null } = {}) {
@@ -59,6 +96,8 @@ async function inspect(pt, { label = null } = {}) {
     return;
   }
   const token = ++state.token;
+  state.routes = {};
+  mapUi.clearRoute();
   state.abort?.abort();
   state.abort = new AbortController();
   state.last = { pt, label, result: null };
@@ -86,6 +125,8 @@ inspectEl.addEventListener('click', (e) => {
   const l = state.last;
   if (act === 'focus') mapUi.focusMarker(key);
   else if (act === 'retry' && l) inspect(l.pt, { label: l.label });
+  else if (act === 'routes') loadRoutes(b.dataset.dest);
+  else if (act === 'show-route') showRoute(b.dataset.dest, b.dataset.kind, Number(b.dataset.i));
   else if (act === 'mark-point' && l) {
     openForm({ geometry: { type: 'Point', coordinates: [l.pt.lon, l.pt.lat] }, name: l.label || l.result?.street?.name || '' }, true);
   } else if (act === 'mark-street' && l?.result?.street) {
@@ -332,10 +373,18 @@ inspectEl.innerHTML = panel.renderIdle();
 persist();
 syncMap();
 
-loadSafety().then((s) => {
-  state.safety = s;
-  renderInspect();
-});
+(async () => {
+  for (const d of state.dests) {
+    try {
+      const hit = await geocodeFixed(d.id, d.queries);
+      Object.assign(d, hit ? { ...hit, state: 'ready' } : { state: 'missing' });
+    } catch {
+      d.state = 'missing';
+    }
+    mapUi.setDestinations(state.dests);
+    if (state.last?.result && !Object.keys(state.routes).length) renderInspect();
+  }
+})();
 loadDistricts()
   .then((features) => {
     state.districts = features;

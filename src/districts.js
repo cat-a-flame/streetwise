@@ -55,12 +55,3 @@ export function findDistrict(features, pt) {
     ) || null
   );
 }
-
-export async function loadSafety() {
-  try {
-    const res = await fetch('/data/district-safety.json');
-    return res.ok ? await res.json() : null;
-  } catch {
-    return null;
-  }
-}

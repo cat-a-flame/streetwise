@@ -9,7 +9,7 @@ const DISTRICT_ACTIVE = { fillOpacity: 0.14, weight: 2.5, opacity: 1 };
 
 let map, handlers;
 let districtLayer, activeDistrict;
-let inspectLayer, outlineLayer, placesLayer, draftLayer, drawLayer;
+let inspectLayer, outlineLayer, placesLayer, draftLayer, drawLayer, destLayer, routeLayer;
 const markerByKey = new Map();
 const placeLayers = new Map();
 
@@ -31,6 +31,8 @@ export function initMap(el, h) {
   map.createPane('districts').style.zIndex = 350;
   map.createPane('places').style.zIndex = 450;
   inspectLayer = L.layerGroup().addTo(map);
+  routeLayer = L.layerGroup().addTo(map);
+  destLayer = L.layerGroup().addTo(map);
   outlineLayer = L.layerGroup().addTo(map);
   placesLayer = L.layerGroup().addTo(map);
   draftLayer = L.layerGroup().addTo(map);
@@ -147,6 +149,38 @@ export function flyToPoint(pt, zoom = 16) {
 
 export function fitBBox(b) {
   map.fitBounds([[b.s, b.w], [b.n, b.e]], { maxZoom: 16, padding: [40, 40] });
+}
+
+/* ---------- destinations & routes ---------- */
+
+const DEST_COLOR = '#b45f06';
+
+export function setDestinations(list) {
+  destLayer.clearLayers();
+  for (const d of list) {
+    if (!d.lat) continue;
+    L.marker([d.lat, d.lon], { icon: badge(d.short, DEST_COLOR, '#fff', d.name), title: d.name, zIndexOffset: 800 })
+      .bindPopup(`<b>${esc(d.name)}</b><br>${esc(d.label || '')}`)
+      .addTo(destLayer);
+  }
+}
+
+export function showRoute(legs) {
+  routeLayer.clearLayers();
+  const all = [];
+  for (const leg of legs) {
+    if (leg.geometry.length < 2) continue;
+    all.push(...leg.geometry);
+    const style = leg.dashed
+      ? { color: '#555', weight: 4, dashArray: '2 7', opacity: 0.9 }
+      : { color: leg.color || '#17375e', weight: 6, opacity: 0.85 };
+    L.polyline(leg.geometry, { ...style, interactive: false }).addTo(routeLayer);
+  }
+  if (all.length) map.fitBounds(all, { padding: [50, 50], maxZoom: 16 });
+}
+
+export function clearRoute() {
+  routeLayer.clearLayers();
 }
 
 /* ---------- saved places ---------- */

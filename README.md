@@ -15,12 +15,13 @@ npm run build      # dist/
 
 - 23 kerület (OSM `admin_level=9`), címkézve, kattintható
 - Keresés (Nominatim, Budapestre korlátozva, debounce + gyorsítótár, max. 1 kérés/s) és kattintás a térképen
-- Környék-elemzés Overpass API-val: legközelebbi bolt, megállók vonalszámokkal, zöld pontszám, közvilágítás, kerületi bűnügyi alapadat
+- Környék-elemzés Overpass API-val: legközelebbi bolt, megállók vonalszámokkal, zöld pontszám, közvilágítás
+- Úti célok: tömegközlekedési (Transitous/MOTIS, hétköznap 9:00-ra érkezve) és autós (OSRM, forgalom nélkül) útvonal a kiválasztott helyről a fix célokhoz, a térképen kirajzolva
 - Saját helyek: tetszik / nem tetszik / semleges + megjegyzés, utca, pont vagy rajzolt terület; localStorage + JSON export/import
 
 ## Adatok
 
-- `public/data/district-safety.json`: kerületi bűnügyi alapadat, **1000 lakosra vetítve**. Jelenleg minden érték `null` (nincs kitöltve), töltsd ki a `crimePer1000` mezőket, az `year`, `source` és `cityAverage` mezőket.
+- `src/destinations.js`: fix úti célok (Bitrise Hungary, Dunakeszi vasútállomás, Dr. Babicz Béla utca 2-6). A címeket a Nominatim keresi meg egyszer, és a böngésző megjegyzi; a megtalált cím látszik a panelen.
 - `public/data/districts.geojson` (opcionális): `npm run fetch:districts` letölti a kerülethatárokat, így az app nem kérdezi le őket induláskor az Overpassról. Ha nincs fájl, az app lekérdezi és IndexedDB-ben tárolja 30 napig.
 
 ## Hogyan számol
@@ -35,4 +36,4 @@ Az OSM adatai hiányosak lehetnek (főleg fák és `lit` címkék), az eredmény
 
 ## Netlify
 
-Overpass is called through `netlify/functions/overpass.mjs` (`/api/overpass`). Serverless functions have a time limit (10 s on many plans), so the area lookup is split into four small queries and the relay gives up after 9 s (`OVERPASS_BUDGET_MS` env var). If you raise the function timeout in the Netlify UI, raise `OVERPASS_BUDGET_MS` too.
+Overpass is called through `netlify/functions/overpass.mjs` (`/api/overpass`). Serverless functions have a time limit (10 s on many plans), so the area lookup is split into four small queries and the relay gives up after 9 s (`OVERPASS_BUDGET_MS` env var). Az útvonalak a `netlify/functions/route.mjs`-en (`/api/route`) mennek át, hogy a kérések azonosító User-Agentet kapjanak. If you raise the function timeout in the Netlify UI, raise `OVERPASS_BUDGET_MS` too.

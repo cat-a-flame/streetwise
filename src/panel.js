@@ -1,5 +1,6 @@
 import { MODES, MODE_ORDER, STATUS } from './config.js';
 import { esc, fmtDist, fmtNum } from './lib/util.js';
+import { fmtClock } from './lib/time.js';
 import { intToRoman } from './lib/util.js';
 
 const walk = (w) => `<span class="num">~${fmtDist(w.meters)}</span> <span class="dim">· ~${w.minutes} perc séta</span>`;
@@ -82,21 +83,50 @@ function lit(l) {
     <p class="note">300 m-es sugarú körben, a <code>lit=yes/no</code> címkével ellátott utak hossza alapján. Alacsony címkézettségnél az arány bizonytalan.</p>`;
 }
 
-function crime(district, safety) {
-  if (!district) return `<p class="dim">Budapesten kívüli pont, nincs kerületi adat.</p>`;
-  const entry = safety?.districts?.[String(district.properties.num)];
-  const v = entry?.crimePer1000;
-  const avg = safety?.cityAverage;
-  if (v == null) {
-    return `<p class="dim">Még nincs kitöltve. Add meg a <code>crimePer1000</code> értéket a <code>public/data/district-safety.json</code> fájlban (${intToRoman(district.properties.num)}. kerület).</p>`;
-  }
-  const meta = [safety.year, safety.source].filter(Boolean).join(' · ');
-  return `<dl class="kv"><div><dt>Bűncselekmény / 1000 lakos</dt><dd><span class="num">${fmtNum(v, 1)}</span></dd></div>
-    ${avg != null ? `<div><dt>Budapesti átlag</dt><dd><span class="num">${fmtNum(avg, 1)}</span></dd></div>` : ''}</dl>
-    ${meta ? `<p class="note">${esc(meta)}</p>` : ''}`;
+const MODE_LABEL = { WALK: 'séta' };
+const modeColor = (l) => l.color || '#17375e';
+
+function option(o, kind, destId, i) {
+  const chips = o.legs
+    .map((l) =>
+      l.transit
+        ? `<span class="chip" style="--c:${modeColor(l)}">${esc(l.name || l.mode)}</span>`
+        : `<span class="walk">${l.minutes}′ ${MODE_LABEL[l.mode] || esc(l.mode.toLowerCase())}</span>`,
+    )
+    .join('<span class="sep">›</span>');
+  return `<button class="row route" data-act="show-route" data-dest="${esc(destId)}" data-kind="${kind}" data-i="${i}">
+    <span class="row-main"><span class="chips">${chips}</span><small>${fmtClock(o.start)} → ${fmtClock(o.end)}${o.transfers > 0 ? ` · ${o.transfers} átszállás` : ' · átszállás nélkül'}</small></span>
+    <span class="row-side"><span class="num">${o.minutes} perc</span></span></button>`;
 }
 
-export function renderResult(res, { district, safety, label, cached }) {
+export function renderRoutes(dest, { transit, car }) {
+  const t =
+    transit.error ? `<p class="dim">Tömegközlekedés: nem sikerült (${esc(transit.error)}).</p>`
+    : transit.value.length
+      ? `<h5>Tömegközlekedés <small>hétköznap 9:00-ra érkezve</small></h5>${transit.value.map((o, i) => option(o, 'transit', dest.id, i)).join('')}`
+      : `<p class="dim">Tömegközlekedés: nem találtam útvonalat.</p>`;
+  const c =
+    car.error ? `<p class="dim">Autó: nem sikerült (${esc(car.error)}).</p>`
+    : `<h5>Autóval</h5><button class="row route" data-act="show-route" data-dest="${esc(dest.id)}" data-kind="car" data-i="0">
+        <span class="row-main"><span>${fmtNum(car.value.km, 1)} km</span><small>forgalom nélkül számolva</small></span>
+        <span class="row-side"><span class="num">${car.value.minutes} perc</span></span></button>`;
+  return t + c;
+}
+
+export function renderDestinations(dests) {
+  return dests
+    .map((d) => {
+      const head = `<h4>${esc(d.name)}</h4>`;
+      if (d.state === 'loading') return `<div class="dest">${head}<p class="dim">Cím keresése…</p></div>`;
+      if (!d.lat) return `<div class="dest">${head}<p class="dim">A cím nem található.</p></div>`;
+      return `<div class="dest" data-dest="${esc(d.id)}">${head}
+        <div class="dim addr">${esc(d.label)}</div>
+        <div class="routes" id="routes-${esc(d.id)}"><button class="btn" data-act="routes" data-dest="${esc(d.id)}">Útvonalak mutatása</button></div></div>`;
+    })
+    .join('');
+}
+
+export function renderResult(res, { district, label, cached, dests }) {
   const p = res.point;
   const dTitle = district ? `${intToRoman(district.properties.num)}. kerület · ${esc(district.properties.name)}` : 'Budapesten kívül';
   return `
@@ -112,7 +142,7 @@ export function renderResult(res, { district, safety, label, cached }) {
   <section><h3>Közlekedés</h3>${transport(res.transport)}</section>
   <section><h3>Zöldterület</h3>${green(res.green)}</section>
   <section><h3>Éjszakai biztonság · közvilágítás</h3>${lit(res.lit)}</section>
-  <section><h3>Kerületi bűnügyi alapadat</h3>${crime(district, safety)}</section>
+  <section><h3>Úti célok</h3>${renderDestinations(dests)}</section>
   <p class="note foot">A gyaloglási táv becslés: légvonal × 1,3, 80 m/perc. Adatok: © OpenStreetMap-közreműködők.</p>`;
 }
 

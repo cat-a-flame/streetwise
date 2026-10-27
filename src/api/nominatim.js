@@ -91,3 +91,39 @@ export async function searchPlaces(raw, signal) {
   persist();
   return results;
 }
+
+// Resolves one fixed address (no Budapest bounding box: some targets are outside it).
+// The first query that returns a hit wins; results are cached for good.
+const FIXED_KEY = 'sw:geo-fixed:v1';
+let fixed = {};
+try {
+  fixed = JSON.parse(localStorage.getItem(FIXED_KEY)) || {};
+} catch {
+  fixed = {};
+}
+
+export async function geocodeFixed(id, queries, signal) {
+  const key = `${id}|${queries.join('|')}`;
+  if (fixed[key]) return fixed[key];
+  for (const q of queries) {
+    const params = new URLSearchParams({
+      q: normalizeQuery(q), format: 'jsonv2', limit: '1', addressdetails: '1', 'accept-language': 'hu', countrycodes: 'hu',
+    });
+    const hit = await limiter(async () => {
+      const res = await fetch(`${NOMINATIM_URL}?${params}`, { signal });
+      if (!res.ok) throw new Error(`Nominatim ${res.status}`);
+      return (await res.json())[0];
+    }, signal);
+    if (hit) {
+      const r = mapResult(hit);
+      fixed[key] = { lat: r.lat, lon: r.lon, label: hit.display_name.split(',').slice(0, 3).join(',').trim() };
+      try {
+        localStorage.setItem(FIXED_KEY, JSON.stringify(fixed));
+      } catch {
+        /* ignore */
+      }
+      return fixed[key];
+    }
+  }
+  return null;
+}
