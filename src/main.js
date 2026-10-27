@@ -122,7 +122,7 @@ async function inspect(pt, { label = null } = {}) {
     inspectEl.scrollTop = 0;
   } catch (e) {
     if (e.name === 'AbortError' || token !== state.token) return;
-    inspectEl.innerHTML = panel.renderError(e.message);
+    inspectEl.innerHTML = panel.renderError(e.message, e.detail);
   }
 }
 

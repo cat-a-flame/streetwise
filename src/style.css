@@ -118,6 +118,7 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .error { border-left: 3px solid var(--dislike); padding: 4px 0 4px 12px; }
 .error p { margin: 4px 0 10px; color: var(--muted); }
+.error .tech { font-family: var(--mono); font-size: 11px; word-break: break-word; }
 
 /* destinations */
 .dest { padding: 8px 0 10px; border-bottom: 1px dotted var(--line); }

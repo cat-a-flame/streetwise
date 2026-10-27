@@ -57,7 +57,8 @@ out geom;`,
   };
 }
 
-const REQUEST_TIMEOUT = 20000;
+const RELAY_TIMEOUT = 12000;
+const DIRECT_TIMEOUT = 30000;
 
 // Per-attempt timeout so a hung server falls through to the next endpoint
 // instead of leaving the UI loading forever.
@@ -82,10 +83,12 @@ async function post(endpoint, query, signal, timeoutMs) {
 // `queued` = go through the shared rate limiter; the one-off district download
 // must not block area lookups behind it.
 async function runOverpass(query, signal, queued = true) {
+  const attempts = [];
   let lastErr;
   for (const endpoint of OVERPASS_ENDPOINTS) {
     try {
-      const timeout = queued ? REQUEST_TIMEOUT : 85000;
+      const relay = endpoint.startsWith('/');
+      const timeout = queued ? (relay ? RELAY_TIMEOUT : DIRECT_TIMEOUT) : 85000;
       const json = queued
         ? await limiter(() => post(endpoint, query, signal, timeout), signal)
         : await post(endpoint, query, signal, timeout);
@@ -94,9 +97,12 @@ async function runOverpass(query, signal, queued = true) {
     } catch (e) {
       if (e.name === 'AbortError') throw e;
       lastErr = e;
-      lastErr.busy = /\b(429|502|503|504)\b|nem válaszolt/.test(e.message);
+      attempts.push(`${endpoint.startsWith('/') ? 'relay' : new URL(endpoint).host}: ${e.message}`);
     }
   }
+  // Everything except a rejected query (400/403/406) is worth retrying later.
+  lastErr.busy = !/\b(400|403|406)\b/.test(lastErr.message);
+  lastErr.detail = attempts.join(' · ');
   throw lastErr;
 }
 
@@ -134,7 +140,7 @@ async function withRetry(task, signal, delays = [2000, 5000]) {
       return await task();
     } catch (e) {
       if (e.name === 'AbortError' || !e.busy || i >= delays.length) {
-        if (e.busy) e.message = 'Az Overpass szerverek jelenleg túlterheltek. Próbáld újra egy perc múlva.';
+        if (e.busy) e.message = 'Az Overpass szerverek jelenleg nem válaszoltak. Próbáld újra egy perc múlva.';
         throw e;
       }
       await sleep(delays[i], signal);

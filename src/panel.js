@@ -17,8 +17,8 @@ export function renderLoading(pt) {
   return `<div class="loading"><span class="spin"></span> Környék lekérdezése…<div class="dim">${pt.lat.toFixed(5)}, ${pt.lon.toFixed(5)}</div></div>`;
 }
 
-export function renderError(msg) {
-  return `<div class="error"><b>Nem sikerült lekérdezni az adatokat.</b><p>${esc(msg)}</p><button class="btn" data-act="retry">Újra</button></div>`;
+export function renderError(msg, detail) {
+  return `<div class="error"><b>Nem sikerült lekérdezni az adatokat.</b><p>${esc(msg)}</p>${detail ? `<p class="note tech">${esc(detail)}</p>` : ''}<button class="btn" data-act="retry">Újra</button></div>`;
 }
 
 function shops(list) {
