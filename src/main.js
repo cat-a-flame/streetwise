@@ -1,6 +1,6 @@
 import './style.css';
 import { analyze } from './analysis.js';
-import { fetchArea } from './api/overpass.js';
+import { fetchArea, PARTS } from './api/overpass.js';
 import { geocodeFixed, searchPlaces } from './api/nominatim.js';
 import { BUDAPEST } from './config.js';
 import { findDistrict, loadDistricts } from './districts.js';
@@ -54,7 +54,9 @@ function renderInspect() {
   if (!l?.result) return;
   const district = findDistrict(state.districts, l.pt);
   mapUi.highlightDistrict(district?.properties.num);
-  inspectEl.innerHTML = panel.renderResult(l.result, { district, label: l.label, cached: l.cached, dests: state.dests, routes: state.routes, openIds: state.open });
+  inspectEl.innerHTML = panel.renderResult(l.result, {
+    district, label: l.label, status: l.status, errors: l.errors, dests: state.dests, routes: state.routes, openIds: state.open,
+  });
 }
 
 /* ---------- routes to the fixed destinations ---------- */
@@ -107,22 +109,36 @@ async function inspect(pt, { label = null } = {}) {
   mapUi.clearRoute();
   state.abort?.abort();
   state.abort = new AbortController();
-  state.last = { pt, label, result: null };
+  const elements = {};
+  const status = Object.fromEntries(PARTS.map((n) => [n, 'pending']));
+  const errors = {};
+  state.last = { pt, label, status, errors, result: analyze({ elements: [] }, pt) };
   showTab('inspect');
-  mapUi.highlightDistrict(findDistrict(state.districts, pt)?.properties.num);
-  inspectEl.innerHTML = panel.renderLoading(pt);
-  try {
-    const { raw, cached } = await fetchArea(pt, state.abort.signal);
-    if (token !== state.token) return;
-    const result = analyze(raw, pt);
-    state.last = { pt, label, result, cached };
+  inspectEl.scrollTop = 0;
+
+  const update = () => {
+    const result = analyze({ elements: Object.values(elements).flat() }, pt);
+    state.last = { pt, label, status, errors, result };
     mapUi.showInspection(result, pt);
     renderInspect();
-    for (const d of state.dests) if (d.lat) loadRoutes(d.id);
-    inspectEl.scrollTop = 0;
+  };
+  update();
+  for (const d of state.dests) if (d.lat) loadRoutes(d.id);
+
+  try {
+    await fetchArea(pt, state.abort.signal, (name, r) => {
+      if (token !== state.token) return;
+      if (r.error) {
+        status[name] = 'failed';
+        errors[name] = r.error.detail || r.error.message;
+      } else {
+        status[name] = 'ok';
+        elements[name] = r.elements;
+      }
+      update();
+    });
   } catch (e) {
-    if (e.name === 'AbortError' || token !== state.token) return;
-    inspectEl.innerHTML = panel.renderError(e.message, e.detail);
+    if (e.name !== 'AbortError') console.error(e);
   }
 }
 

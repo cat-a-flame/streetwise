@@ -141,22 +141,34 @@ export function renderDestinations(dests, routes, openIds, from) {
     .join('');
 }
 
-export function renderResult(res, { district, label, cached, dests, routes, openIds }) {
+// 'failed' beats 'pending' beats 'ok' across the parts a section depends on.
+function section(title, parts, status, errors, body) {
+  const st = parts.map((p) => status[p]);
+  let inner;
+  if (st.includes('failed')) {
+    const detail = parts.map((p) => errors[p]).filter(Boolean)[0];
+    inner = `<p class="dim">Most nem sikerült betölteni. <button class="linkbtn" data-act="retry">Újra</button></p>${detail ? `<p class="note tech">${esc(detail)}</p>` : ''}`;
+  } else if (st.includes('pending')) inner = `<p class="dim"><span class="spin"></span> Betöltés…</p>`;
+  else inner = body();
+  return `<section><h3>${title}</h3>${inner}</section>`;
+}
+
+export function renderResult(res, { district, label, status, errors, dests, routes, openIds }) {
   const p = res.point;
   const dTitle = district ? `${intToRoman(district.properties.num)}. kerület · ${esc(district.properties.name)}` : 'Budapesten kívül';
   return `
   <header class="loc">
     <h2>${esc(label || res.street?.name || 'Kiválasztott pont')}</h2>
-    <div class="dim">${esc(dTitle)} · <span class="num">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span>${cached ? ' · <span title="Gyorsítótárból">mentett</span>' : ''}</div>
+    <div class="dim">${esc(dTitle)} · <span class="num">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span></div>
     <div class="actions">
       <button class="btn" data-act="mark-point">Pont jelölése</button>
       ${res.street ? `<button class="btn" data-act="mark-street">Utca jelölése: ${esc(res.street.name)}</button>` : ''}
     </div>
   </header>
-  <section><h3>Élelmiszerbolt</h3>${shops(res.shops)}</section>
-  <section><h3>Közlekedés</h3>${transport(res.transport)}</section>
-  <section><h3>Zöldterület</h3>${green(res.green)}</section>
-  <section><h3>Éjszakai biztonság · közvilágítás</h3>${lit(res.lit)}</section>
+  ${section('Élelmiszerbolt', ['shops'], status, errors, () => shops(res.shops))}
+  ${section('Közlekedés', ['stops'], status, errors, () => transport(res.transport))}
+  ${section('Zöldterület', ['green', 'trees', 'park'], status, errors, () => green(res.green))}
+  ${section('Éjszakai biztonság · közvilágítás', ['lit'], status, errors, () => lit(res.lit))}
   <section><h3>Úti célok</h3>${renderDestinations(dests, routes, openIds, res.point)}</section>
   <p class="note foot">A gyaloglási táv becslés: légvonal × 1,3, 80 m/perc. Adatok: © OpenStreetMap-közreműködők.</p>`;
 }

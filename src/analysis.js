@@ -244,7 +244,14 @@ function dropNullGeometry(els) {
 }
 
 export function analyze(raw, pt) {
-  const els = dropNullGeometry(raw.elements || []);
+  // The same object can come back from several queries.
+  const seen = new Set();
+  const els = dropNullGeometry(
+    (raw.elements || []).filter((e) => {
+      const k = `${e.type}/${e.id}`;
+      return !seen.has(k) && seen.add(k);
+    }),
+  );
   const transport = analyzeTransport(els, pt);
   const { litShare, street } = analyzeStreets(els, pt);
   return {

@@ -9,7 +9,7 @@ const GREEN_LEISURE = '^(park|garden|nature_reserve)$';
 const GREEN_LANDUSE = '^(grass|forest|recreation_ground|village_green|meadow)$';
 const GREEN_NATURAL = '^(wood|scrub|grassland|heath)$';
 const STREET_TYPES =
-  '^(residential|living_street|pedestrian|footway|path|cycleway|steps|unclassified|tertiary|secondary|primary|trunk)$';
+  '^(residential|living_street|pedestrian|unclassified|tertiary|secondary|primary|trunk)$';
 
 // Snapped point -> four small queries (a single big one outlasts the 10 s limit of
 // serverless relays): shops + stops (+ route relations), green areas, trees, street lighting.
@@ -19,13 +19,14 @@ export function buildQueries({ lat, lon }) {
   const greenAround = `(around:${green + pad},${at})`;
   const head = '[out:json][timeout:25];';
   return {
-    poi: `${head}
+    shops: `${head}
 nwr["shop"~"^(supermarket|convenience)$"](around:${shop + pad},${at});
 out center tags;
 nwr["shop"~"^(supermarket|convenience)$"]["name"~"spar|lidl",i](around:${chain + pad},${at});
 out center tags;
 nwr["shop"~"^(supermarket|convenience)$"]["brand"~"spar|lidl",i](around:${chain + pad},${at});
-out center tags;
+out center tags;`,
+    stops: `${head}
 (
   node["highway"="bus_stop"](around:${stop + pad},${at});
   node["railway"="tram_stop"](around:${stop + pad},${at});
@@ -44,6 +45,10 @@ out body;`,
   rel["landuse"~"${GREEN_LANDUSE}"]${greenAround};
   way["natural"~"${GREEN_NATURAL}"]${greenAround};
   rel["natural"~"${GREEN_NATURAL}"]${greenAround};
+);
+out geom;`,
+    park: `${head}
+(
   way["leisure"="park"](around:${park + pad},${at});
   rel["leisure"="park"](around:${park + pad},${at});
 );
@@ -123,43 +128,33 @@ async function pool(tasks, n) {
   return out;
 }
 
-const sleep = (ms, signal) =>
-  new Promise((resolve, reject) => {
-    const t = setTimeout(resolve, ms);
-    signal?.addEventListener('abort', () => {
-      clearTimeout(t);
-      reject(new DOMException('Aborted', 'AbortError'));
-    });
-  });
+export const PARTS = ['shops', 'stops', 'green', 'trees', 'lit', 'park'];
 
-// The public Overpass servers are often at capacity (502/504): retry with backoff,
-// per query, so parts that already succeeded are not repeated.
-async function withRetry(task, signal, delays = [2000, 5000]) {
-  for (let i = 0; ; i++) {
-    try {
-      return await task();
-    } catch (e) {
-      if (e.name === 'AbortError' || !e.busy || i >= delays.length) {
-        if (e.busy) e.message = 'Az Overpass szerverek jelenleg nem válaszoltak. Próbáld újra egy perc múlva.';
-        throw e;
-      }
-      await sleep(delays[i], signal);
-    }
-  }
-}
-
-export async function fetchArea(pt, signal) {
+// Loads the area piece by piece. Each part is cached on its own, so a retry only
+// fetches what is still missing, and `onPart` lets the UI fill in sections as
+// they arrive instead of waiting for the slowest query.
+export async function fetchArea(pt, signal, onPart) {
   const snapped = { lat: snap(pt.lat), lon: snap(pt.lon) };
-  const key = `ow:v3:${snapped.lat.toFixed(3)},${snapped.lon.toFixed(3)}`;
-  const cached = await cacheGet(key, TTL);
-  if (cached) return { raw: cached, cached: true };
-  const parts = await pool(
-    Object.values(buildQueries(snapped)).map((q) => () => withRetry(() => runOverpass(q, signal), signal)),
+  const queries = buildQueries(snapped);
+  await pool(
+    PARTS.map((name) => async () => {
+      const key = `ow:v4:${name}:${snapped.lat.toFixed(3)},${snapped.lon.toFixed(3)}`;
+      try {
+        let elements = await cacheGet(key, TTL);
+        const cached = !!elements;
+        if (!elements) {
+          elements = (await runOverpass(queries[name], signal)).elements || [];
+          await cacheSet(key, elements);
+        }
+        onPart(name, { elements, cached });
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        e.message = e.busy ? 'Az Overpass szerverek nem válaszoltak.' : e.message;
+        onPart(name, { error: e });
+      }
+    }),
     2,
   );
-  const raw = { elements: parts.flatMap((p) => p.elements || []) };
-  await cacheSet(key, raw);
-  return { raw, cached: false };
 }
 
 export async function fetchDistrictsFromOverpass(signal) {
