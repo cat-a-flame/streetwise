@@ -15,12 +15,16 @@ const STREET_TYPES =
 // serverless relays): shops + stops (+ route relations), green areas, trees, street lighting.
 export function buildQueries({ lat, lon }) {
   const at = `${lat},${lon}`;
-  const { shop, stop, metro, green, park, lit, pad } = RADIUS;
+  const { shop, chain, stop, metro, green, park, lit, pad } = RADIUS;
   const greenAround = `(around:${green + pad},${at})`;
   const head = '[out:json][timeout:25];';
   return {
     poi: `${head}
 nwr["shop"~"^(supermarket|convenience)$"](around:${shop + pad},${at});
+out center tags;
+nwr["shop"~"^(supermarket|convenience)$"]["name"~"spar|lidl",i](around:${chain + pad},${at});
+out center tags;
+nwr["shop"~"^(supermarket|convenience)$"]["brand"~"spar|lidl",i](around:${chain + pad},${at});
 out center tags;
 (
   node["highway"="bus_stop"](around:${stop + pad},${at});
@@ -114,7 +118,7 @@ async function pool(tasks, n) {
 
 export async function fetchArea(pt, signal) {
   const snapped = { lat: snap(pt.lat), lon: snap(pt.lon) };
-  const key = `ow:v2:${snapped.lat.toFixed(3)},${snapped.lon.toFixed(3)}`;
+  const key = `ow:v3:${snapped.lat.toFixed(3)},${snapped.lon.toFixed(3)}`;
   const cached = await cacheGet(key, TTL);
   if (cached) return { raw: cached, cached: true };
   const parts = await pool(

@@ -16,6 +16,7 @@ export const OVERPASS_ENDPOINTS = ['/api/overpass'];
 // ~100 m) still covers the exact clicked point.
 export const RADIUS = {
   shop: 1500,
+  chain: 3000, // nearest Spar / Lidl, searched wider than the general shop list
   stop: 600,
   metro: 1500,
   green: 400,

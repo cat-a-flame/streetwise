@@ -26,7 +26,7 @@ function shops(list) {
   return `<ul class="rows">${list
     .map(
       (s, i) => `<li><button class="row" data-act="focus" data-key="shop-${i}">
-        <span class="row-main">${esc(s.name)}<small>${s.type === 'supermarket' ? 'Szupermarket' : 'Kisbolt'}</small></span>
+        <span class="row-main">${esc(s.name)}<small>${s.extra ? `legközelebbi ${esc(s.extra)}` : s.type === 'supermarket' ? 'Szupermarket' : 'Kisbolt'}</small></span>
         <span class="row-side">${walk(s.walk)}</span></button></li>`,
     )
     .join('')}</ul>`;

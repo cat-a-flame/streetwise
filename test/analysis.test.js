@@ -106,3 +106,19 @@ test('null entries in out-geom geometry are ignored', () => {
   const r = analyze(raw, pt);
   assert.equal(r.street.name, 'X utca');
 });
+
+test('nearest Spar/Lidl is appended only when not already in the list', () => {
+  const shop = (id, name, x, shop = 'supermarket') => ({ type: 'node', id, ...at(x, 0), tags: { shop, name } });
+  // Spar is among the 3 nearest (no extra); Lidl is farther (extra, 2 km away)
+  let r = analyze({ elements: [shop(1, 'Közért', 100, 'convenience'), shop(2, 'Spar Express', 200), shop(3, 'Coop', 300), shop(4, 'Lidl', 2000), shop(5, 'Lidl', 2500)] }, pt);
+  assert.deepEqual(r.shops.map((s) => s.name), ['Közért', 'Spar Express', 'Coop', 'Lidl']);
+  assert.equal(r.shops[3].extra, 'Lidl');
+  assert.ok(Math.abs(r.shops[3].dist - 2000) < 5);
+  assert.equal(r.shops.filter((s) => s.extra).length, 1);
+  // duplicates from several queries are counted once; nothing within 3 km -> nothing added
+  r = analyze({ elements: [shop(1, 'Coop', 100), shop(1, 'Coop', 100), shop(9, 'Lidl', 3500)] }, pt);
+  assert.deepEqual(r.shops.map((s) => s.name), ['Coop']);
+  // brand-only match and a look-alike name that must not match
+  r = analyze({ elements: [{ type: 'node', id: 7, ...at(2200, 0), tags: { shop: 'supermarket', brand: 'SPAR' } }, shop(8, 'Sparta Market', 1800)] }, pt);
+  assert.deepEqual(r.shops.map((s) => s.extra ?? null), ['Spar']); // Sparta Market (1.8 km) is outside the list radius and not a Spar
+});

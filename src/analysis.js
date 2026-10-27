@@ -43,24 +43,41 @@ const lineSort = (a, b) => {
   return (isNaN(na) ? 1e9 : na) - (isNaN(nb) ? 1e9 : nb) || a.localeCompare(b, 'hu');
 };
 
+const CHAINS = [
+  { key: 'spar', label: 'Spar', re: /\b(inter)?spar\b/i },
+  { key: 'lidl', label: 'Lidl', re: /\blidl\b/i },
+];
+
 function analyzeShops(els, pt) {
-  return els
-    .filter((e) => e.tags && (e.tags.shop === 'supermarket' || e.tags.shop === 'convenience'))
-    .map((e) => {
-      const c = coordOf(e);
-      if (!c) return null;
-      const dist = haversine(pt, c);
-      return {
-        ...c,
-        dist,
-        walk: walkInfo(dist),
-        type: e.tags.shop,
-        name: e.tags.name || e.tags.brand || (e.tags.shop === 'supermarket' ? 'Szupermarket' : 'Kisbolt'),
-      };
-    })
-    .filter((s) => s && s.dist <= RADIUS.shop)
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, 3);
+  const seen = new Set();
+  const all = [];
+  for (const e of els) {
+    if (!e.tags || (e.tags.shop !== 'supermarket' && e.tags.shop !== 'convenience')) continue;
+    const id = `${e.type}/${e.id}`;
+    const c = coordOf(e);
+    if (!c || seen.has(id)) continue; // the same shop comes back from several queries
+    seen.add(id);
+    const dist = haversine(pt, c);
+    all.push({
+      ...c,
+      id,
+      dist,
+      walk: walkInfo(dist),
+      type: e.tags.shop,
+      chain: CHAINS.find((ch) => ch.re.test(`${e.tags.name || ''} ${e.tags.brand || ''}`))?.key ?? null,
+      name: e.tags.name || e.tags.brand || (e.tags.shop === 'supermarket' ? 'Szupermarket' : 'Kisbolt'),
+    });
+  }
+  all.sort((a, b) => a.dist - b.dist);
+  const list = all.filter((s) => s.dist <= RADIUS.shop).slice(0, 3);
+
+  // Nearest Spar / Lidl, but only when the list above does not already contain one.
+  for (const ch of CHAINS) {
+    if (list.some((s) => s.chain === ch.key)) continue;
+    const hit = all.find((s) => s.chain === ch.key && s.dist <= RADIUS.chain);
+    if (hit) list.push({ ...hit, extra: ch.label });
+  }
+  return list;
 }
 
 function analyzeTransport(els, pt) {
